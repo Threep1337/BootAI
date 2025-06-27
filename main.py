@@ -115,30 +115,51 @@ def main():
 
     client = genai.Client(api_key=api_key)
     config = types.GenerateContentConfig(system_instruction=system_prompt, tools=[available_functions])
-    response = client.models.generate_content(model="gemini-2.0-flash-001",contents=messages,config=config)
 
-    
-    
-    if len(response.function_calls) > 0:
-        for function_call in response.function_calls:
-            #print(f"Calling function: {function_call.name}({function_call.args})")
-            if verbose:
-                function_call_result = call_function(function_call,True)
-            else:
-                function_call_result = call_function(function_call)
+    maxtries = 1
 
-            function_call_result_text = function_call_result.parts[0].function_response.response
-            if not function_call_result_text:
-                raise Exception("No function call results")
-            
-            if verbose:
-                print (print(f"-> {function_call_result.parts[0].function_response.response}"))
-    else:
-        print (response.text)
+    currentAttempt = 0
+    while currentAttempt <= 20:
+        currentAttempt += 1
+        functionCalled = False
+        #print(f"On iteration {currentAttempt}")
 
-    if verbose:
-        print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
-        print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+
+        response = client.models.generate_content(model="gemini-2.0-flash-001",contents=messages,config=config)
+        for candidate in response.candidates:
+            #print(f"candidate: {candidate.content}")
+            #messages.append(types.Content(role="model", parts=[types.Part(text=candidate.content)]))
+            messages.append(candidate.content)
+        
+        #print("After candidate append")
+        if response.function_calls and len(response.function_calls) > 0:
+            functionCalled = True
+            for function_call in response.function_calls:
+                #print(f"Calling function: {function_call.name}({function_call.args})")
+                if verbose:
+                    function_call_result = call_function(function_call,True)
+                else:
+                    function_call_result = call_function(function_call)
+
+                #function_call_result_text = function_call_result.parts[0].function_response.response
+
+                #if not function_call_result_text:
+                #    raise Exception("No function call results")
+                #print ("After function call")
+                if verbose:
+                    print (print(f"-> {function_call_result.parts[0].function_response.response}"))
+        else:
+            print (response.text)
+            break
+
+        for candidate in response.candidates:
+            #print(f"candidate: {candidate.content}")
+            #messages.append(types.Content(role="model", parts=[types.Part(text=candidate.content)]))
+            messages.append(candidate.content)
+
+        if verbose:
+            print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
+            print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
 
 
 if __name__ == "__main__":
